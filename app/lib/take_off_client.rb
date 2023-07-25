@@ -58,20 +58,10 @@ class TakeOffClient
 
   private
 
-  def make_request()
-  end
-
   def establish_connection(url)
     Faraday.new(
       url: url,
-      # params: {param: '1'},
       headers: {'Content-Type' => 'application/json'}
     ) 
-    # do |conn|
-    #   conn.request :retry, max: 10, interval: 0.05,
-    #     interval_randomness: 0.5, backoff_factor: 2,
-    #     exceptions: [StandardError, 'Timeout::Error']
-
-    # end
   end
 end
