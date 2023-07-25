@@ -95,6 +95,10 @@ RSpec.describe TakeOffClient do
       # The subscription of 'other_user' was deleted
       response = clients.values.sample.flights_subscriptions_list(flight_id)
       expect(response['value']).to be_empty
+
+      # TODOs
+      # - Force a race condition of booking and check just one booking is accepted
+      # - Stop a coordinator and check everything keeps working
     end
   end
 end
