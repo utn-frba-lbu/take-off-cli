@@ -1,11 +1,11 @@
 require 'rails_helper'
 
 RSpec.describe TakeOffClient do
+  def client(port)
+    described_class.new("http://localhost:#{port}")
+  end
+
   context 'when all goes good' do
-    def client(port)
-      described_class.new("http://localhost:#{port}")
-    end
-    
     before(:all) do
       @node_manager = TakeOffNode.new
       @node_manager.start_nodes([27001, 27002])
@@ -32,16 +32,13 @@ RSpec.describe TakeOffClient do
       # Create a flight
       flight = FactoryBot.build(:flight, datetime: "2025-06-24T00:00:00Z", seats: { window: 25, aisle: 25, between_seats: 25 })
       response = clients[27001].flights_create(flight)
-      expect(response).to eq("status" => "ok")
+      expect(response).to include("status" => "ok")
 
       # The flight exists in all nodes
       clients.values.each do |client|
         response = client.flights_list()
         expect(response['value'].values.first['origin']).to eq(flight[:origin])
       end
-
-      # The user received the alert
-      # TODO: check how to test this
 
       # Start a new node and check to see if it has the flight
       @node_manager.start_node(27004)
@@ -97,8 +94,42 @@ RSpec.describe TakeOffClient do
       expect(response['value']).to be_empty
 
       # TODOs
-      # - Force a race condition of booking and check just one booking is accepted
       # - Stop a coordinator and check everything keeps working
+    end
+  end
+
+  context 'when multiple people try to book the same seats' do
+    before(:all) do
+      @node_manager = TakeOffNode.new
+      @node_manager.start_nodes(10.times.map { |i| 27400 + i } )
+    end
+
+    after(:all) do
+      @node_manager.stop_all
+    end
+
+    it 'only valid bookings are accepted' do
+      n = 30
+      test_clients = n.times.map do |i|
+        client(@node_manager.nodes.values.sample)
+      end
+
+      # Create a flight
+      flight = FactoryBot.build(:flight, datetime: "2025-06-24T00:00:00Z", seats: { window: 2, aisle: 0, between_seats: 0 })
+      response = test_clients.first.flights_create(flight)
+      expect(response).to include("status" => "ok")
+      flight_id = response['value']['id']
+
+      sleep(2)
+
+      booking = FactoryBot.build(:booking, flight_id: flight_id, user: "user", seats: { window: 1, aisle: 0, between_seats: 0 })
+
+      responses = Parallel.map(test_clients, in_processes: n) do |client|
+        client.bookings_create(booking)
+      end
+
+      expect( responses.count{ |r| r["status"] == "booking_accepted"} ).to eq(2)
+      expect( responses.count{ |r| ["booking_denied", "flight_closed"].include?(r["status"]) }).to eq(n-2)
     end
   end
 end

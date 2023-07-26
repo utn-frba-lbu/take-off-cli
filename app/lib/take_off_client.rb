@@ -37,8 +37,9 @@ class TakeOffClient
   end
 
   def bookings_create(booking)
-    response = connection.post("/reservations", booking.to_json)
-    JSON.parse(response.body)
+    make_request(:post, "/reservations", booking.to_json)
+    # response = connection.post("/reservations", booking.to_json)
+    # JSON.parse(response.body)
   end
 
   def bookings_list()
@@ -57,6 +58,15 @@ class TakeOffClient
   end
 
   private
+
+  def make_request(method, path, body = nil)
+    response = connection.send(method, path, body)
+    JSON.parse(response.body)
+  rescue => e
+    binding.pry
+    puts "Error. Response: #{response.inspect}"
+    raise e
+  end
 
   def establish_connection(url)
     Faraday.new(

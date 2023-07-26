@@ -7,10 +7,16 @@ class TakeOffNode
 
   def start_node(port)
     add_node(port)
+    validate_node_alive(port)
   end
 
   def start_nodes(ports)
     ports.each { |port| add_node(port) }
+    # Parallel.each(ports, in_threads: ports.size) do |port|
+    ports.each do |port|
+      # start_node(port)
+      validate_node_alive(port)
+    end
   end
 
   def stop_node(name)
@@ -28,18 +34,20 @@ class TakeOffNode
     name = "node-#{port}"
     `cd ../iasc-take-off && PORT=#{port} elixir --erl "-detached" --name #{name}@127.0.0.1 -S mix phx.server`
     nodes[name] = port
+  end
 
+  def validate_node_alive(port)
     client = TakeOffClient.new("http://localhost:#{port}")
 
     10.times do
+      puts "Validating health of node #{port}"
       client.health_check
-      puts "Node #{name} started"
+      puts "Node #{port} ready"
       return
     rescue StandardError => e
-      puts e
-      sleep(1)
+      sleep(2)
     end
 
-    raise StandardError, "Node #{name} could not be started"
+    raise StandardError, "Node #{port} could not be started"
   end
 end
