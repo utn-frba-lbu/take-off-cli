@@ -7,8 +7,9 @@ RSpec.describe TakeOffClient do
 
   context 'when all goes good' do
     before(:all) do
+      sleep(5)
       @node_manager = TakeOffNode.new
-      @node_manager.start_nodes([27001, 27002])
+      @node_manager.start_nodes([27701, 27702])
     end
 
     after(:all) do
@@ -20,7 +21,7 @@ RSpec.describe TakeOffClient do
 
       # Create an alert
       alert = FactoryBot.build(:alert, :with_date, date: "2025-06-24")
-      response = clients[27001].alerts_create(alert)
+      response = clients.values.sample.alerts_create(alert)
       expect(response).to eq("status" => "ok")
 
       # The alert exists in all nodes
@@ -31,7 +32,7 @@ RSpec.describe TakeOffClient do
 
       # Create a flight
       flight = FactoryBot.build(:flight, datetime: "2025-06-24T00:00:00Z", seats: { window: 25, aisle: 25, between_seats: 25 })
-      response = clients[27001].flights_create(flight)
+      response = clients.values.sample.flights_create(flight)
       expect(response).to include("status" => "ok")
 
       # The flight exists in all nodes
@@ -41,9 +42,9 @@ RSpec.describe TakeOffClient do
       end
 
       # Start a new node and check to see if it has the flight
-      @node_manager.start_node(27004)
-      clients[27004] = client(27004)
-      response = clients[27004].flights_list()
+      @node_manager.start_node(27704)
+      clients[27704] = client(27704)
+      response = clients[27704].flights_list()
       expect(response['value'].values.first['origin']).to eq(flight[:origin])
 
       # Subscribe to the flight
@@ -58,8 +59,8 @@ RSpec.describe TakeOffClient do
       end
 
       # Delete a node to check everything keeps working
-      @node_manager.stop_node("node-27001")
-      clients.delete(27001)
+      @node_manager.stop_node("node-27701")
+      clients.delete(27701)
 
       # Create a booking
       booking = FactoryBot.build(:booking, flight_id: flight_id, user: "user", seats: { window: 1, aisle: 0, between_seats: 0 })
@@ -92,16 +93,67 @@ RSpec.describe TakeOffClient do
       # The subscription of 'other_user' was deleted
       response = clients.values.sample.flights_subscriptions_list(flight_id)
       expect(response['value']).to be_empty
+    end
+  end
 
-      # TODOs
-      # - Stop a coordinator and check everything keeps working
+  context 'when the coordinator node goes down' do
+    before(:all) do
+      sleep(5)
+      @node_manager = TakeOffNode.new
+      @node_manager.start_nodes(2.times.map { |i| 27500 + i } )
+    end
+
+    after(:all) do
+      @node_manager.stop_all
+    end
+
+    it 'other coordintor is created to confirm bookings' do
+      clients = @node_manager.nodes.map { |name, port| [name, client(port)] }.to_h
+
+      # Create a flight
+      flight = FactoryBot.build(:flight, datetime: "2025-06-24T00:00:00Z", seats: { window: 2, aisle: 0, between_seats: 0 })
+      response = clients.values.first.flights_create(flight)
+      flight_id = response['value']['id']
+      expect(response).to include("status" => "ok")
+
+      sleep(2)
+
+      # Create a booking
+      booking = FactoryBot.build(:booking, flight_id: flight_id, user: "user", seats: { window: 1, aisle: 0, between_seats: 0 })
+      response = clients.values.sample.bookings_create(booking)
+      expect(response).to include("status" => "booking_accepted")
+
+      # Get the coordinator node
+      response = clients.values.first.flights_get_coordinator_node(flight_id)
+      coordinator_node_name = response['value'].split('@').first
+
+      # Stop the coordinator node
+      @node_manager.stop_node(coordinator_node_name)
+
+      sleep(1)
+
+      # Get the new coordinator node
+      alive_client = clients.find { |name, _| name != coordinator_node_name }.last
+      response = alive_client.flights_get_coordinator_node(flight_id)
+      new_coordinator_node_name = response['value'].split('@').first
+      expect(new_coordinator_node_name).to_not eq(coordinator_node_name)
+
+      # Create two new bookings
+      booking = FactoryBot.build(:booking, flight_id: flight_id, user: "user", seats: { window: 1, aisle: 0, between_seats: 0 })
+      response = alive_client.bookings_create(booking)
+      expect(response).to include("status" => "booking_accepted")
+
+      booking = FactoryBot.build(:booking, flight_id: flight_id, user: "user", seats: { window: 1, aisle: 0, between_seats: 0 })
+      response = alive_client.bookings_create(booking)
+      expect(response).to include("status" => "flight_closed")
     end
   end
 
   context 'when multiple people try to book the same seats' do
     before(:all) do
+      sleep(5)
       @node_manager = TakeOffNode.new
-      @node_manager.start_nodes(10.times.map { |i| 27400 + i } )
+      @node_manager.start_nodes(10.times.map { |i| 27600 + i } )
     end
 
     after(:all) do
@@ -110,13 +162,13 @@ RSpec.describe TakeOffClient do
 
     it 'only valid bookings are accepted' do
       n = 30
-      test_clients = n.times.map do |i|
+      clients = n.times.map do |i|
         client(@node_manager.nodes.values.sample)
       end
 
       # Create a flight
       flight = FactoryBot.build(:flight, datetime: "2025-06-24T00:00:00Z", seats: { window: 2, aisle: 0, between_seats: 0 })
-      response = test_clients.first.flights_create(flight)
+      response = clients.first.flights_create(flight)
       expect(response).to include("status" => "ok")
       flight_id = response['value']['id']
 
@@ -124,7 +176,7 @@ RSpec.describe TakeOffClient do
 
       booking = FactoryBot.build(:booking, flight_id: flight_id, user: "user", seats: { window: 1, aisle: 0, between_seats: 0 })
 
-      responses = Parallel.map(test_clients, in_processes: n) do |client|
+      responses = Parallel.map(clients, in_processes: n) do |client|
         client.bookings_create(booking)
       end
 

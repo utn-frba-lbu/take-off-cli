@@ -12,15 +12,13 @@ class TakeOffNode
 
   def start_nodes(ports)
     ports.each { |port| add_node(port) }
-    # Parallel.each(ports, in_threads: ports.size) do |port|
     ports.each do |port|
-      # start_node(port)
       validate_node_alive(port)
     end
   end
 
   def stop_node(name)
-    `kill $(lsof -s TCP:LISTEN -ti:#{nodes[name]})`
+    `kill -9 $(lsof -s TCP:LISTEN -ti:#{nodes[name]})`
     nodes.delete(name)
   end
 

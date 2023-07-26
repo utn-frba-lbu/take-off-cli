@@ -28,8 +28,8 @@ class TakeOffClient
     make_request(:get, "/flights/#{flight_id}/subscriptions")
   end
 
-  def flights_get_supervisor_node(flight_id)
-    make_request(:get, "/flights/#{flight_id}/supervisor")
+  def flights_get_coordinator_node(flight_id)
+    make_request(:get, "/flights/#{flight_id}/coordinator")
   end
 
   def bookings_create(booking)
