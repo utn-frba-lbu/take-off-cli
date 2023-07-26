@@ -1,10 +1,9 @@
 require 'rails_helper'
 
 RSpec.describe TakeOffClient do
-  context 'when all goes good' do
+  context 'when everything goes well' do
     before(:all) do
       @node_manager = TakeOffNode.new(27220)
-      sleep(5)
     end
 
     after(:all) do
@@ -54,6 +53,7 @@ RSpec.describe TakeOffClient do
 
       # Delete a node to check everything keeps working
       @node_manager.stop_node(@node_manager.node_names.first)
+      sleep(2)
 
       # Create a booking
       booking = FactoryBot.build(:booking, flight_id: flight_id, user: "user", seats: { window: 1, aisle: 0, between_seats: 0 })
@@ -91,7 +91,6 @@ RSpec.describe TakeOffClient do
 
   context 'when the coordinator node goes down' do
     before(:all) do
-      sleep(5)
       @node_manager = TakeOffNode.new(27240)
     end
 
@@ -143,8 +142,7 @@ RSpec.describe TakeOffClient do
 
   context 'when multiple people try to book the same seats' do
     before(:all) do
-      sleep(5)
-      @node_manager = TakeOffNode.new(27260)
+      @node_manager = TakeOffNode.new(27401)
     end
 
     after(:all) do

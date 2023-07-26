@@ -54,7 +54,6 @@ class TakeOffClient
     response = connection.send(method, path, body)
     JSON.parse(response.body)
   rescue => e
-    puts "Error. Response: #{response.inspect}"
     raise e
   end
 

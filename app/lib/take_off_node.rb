@@ -25,7 +25,7 @@ class TakeOffNode
   end
 
   def stop_node(name)
-    `kill -9 $(lsof -s TCP:LISTEN -ti:#{nodes[name][:port]})`
+    `docker rm -f #{name}`
     nodes.delete(name)
   end
 
@@ -53,17 +53,17 @@ class TakeOffNode
 
   def add_node(port)
     name = "node-#{port}"
-    `cd ../iasc-take-off && PORT=#{port} elixir --erl "-detached" --name #{name}@127.0.0.1 -S mix phx.server`
+    `docker run -e PORT=#{port} -e NAME=#{name}@127.0.0.1 --network host --name #{name} -d takeoff`
     nodes[name] = {port: port, client: TakeOffClient.new("http://localhost:#{port}")}
     @created_nodes += 1
     name
   end
 
   def validate_node_alive(name)
-    10.times do
-      puts "Validating health of node #{name}"
+    puts "Validating health of node #{name}"
+    20.times do
       client(name).health_check
-      puts "Node #{name} ready"
+      puts ":D"
       return
     rescue StandardError => e
       sleep(2)
